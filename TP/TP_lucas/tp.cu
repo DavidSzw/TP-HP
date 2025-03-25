@@ -9,8 +9,8 @@
 #include <time.h>
 #include <cuda_runtime.h>
 
-// Gaussian function
-__device__ double gaussian(double x, double sigma) {
+// Gaussian function (host and device)
+__host__ __device__ double gaussian(double x, double sigma) {
     return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
