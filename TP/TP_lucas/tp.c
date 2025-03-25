@@ -13,14 +13,14 @@ double gaussian(double x, double sigma) {
     return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
-// Manual bilateral filter
+// Filtre bilatéral manuel
 void bilateral_filter(unsigned char *src, unsigned char *dst, int width, int height, int channels, int d, double sigma_color, double sigma_space) {
     int radius = d / 2;
 
-    // Precompute spatial Gaussian weights
+    // Pré-calculer les poids gaussiens spatiaux
     double *spatial_weights = (double *)malloc(d * d * sizeof(double));
     if (!spatial_weights) {
-        printf("Memory allocation for spatial weights failed!\n");
+        printf("Échec de l'allocation de mémoire pour les poids spatiaux!\n");
         return;
     }
 
@@ -31,45 +31,45 @@ void bilateral_filter(unsigned char *src, unsigned char *dst, int width, int hei
         }
     }
 
-    // Process image
+    // Traiter l'image
     for (int y = radius; y < height - radius; y++) {
         for (int x = radius; x < width - radius; x++) {
             double weight_sum[3] = {0.0, 0.0, 0.0};
             double filtered_value[3] = {0.0, 0.0, 0.0};
 
-            // Get center pixel pointer
+            // Obtenir le pointeur du pixel central
             unsigned char *center_pixel = src + (y * width + x) * channels;
 
-            // Iterate over local window
+            // Itérer sur la fenêtre locale
             for (int i = 0; i < d; i++) {
                 for (int j = 0; j < d; j++) {
                     int nx = x + j - radius;
                     int ny = y + i - radius;
 
-                    // Bounds check to ensure we're within the image
+                    // Vérification des limites pour s'assurer que nous sommes dans l'image
                     if (nx < 0 || nx >= width || ny < 0 || ny >= height) {
                         continue;
                     }
 
-                    // Get neighbor pixel pointer
+                    // Obtenir le pointeur du pixel voisin
                     unsigned char *neighbor_pixel = src + (ny * width + nx) * channels;
 
                     for (int c = 0; c < channels; c++) {
-                        // Compute range weight
+                        // Calculer le poids de la plage
                         double range_weight = gaussian(abs(neighbor_pixel[c] - center_pixel[c]), sigma_color);
                         double weight = spatial_weights[i * d + j] * range_weight;
 
-                        // Accumulate weighted sum
+                        // Accumuler la somme pondérée
                         filtered_value[c] += neighbor_pixel[c] * weight;
                         weight_sum[c] += weight;
                     }
                 }
             }
 
-            // Normalize and store result
+            // Normaliser et stocker le résultat
             unsigned char *output_pixel = dst + (y * width + x) * channels;
             for (int c = 0; c < channels; c++) {
-                output_pixel[c] = (unsigned char)(filtered_value[c] / (weight_sum[c] + 1e-6)); // Avoid division by zero
+                output_pixel[c] = (unsigned char)(filtered_value[c] / (weight_sum[c] + 1e-6)); // Éviter la division par zéro
             }
         }
     }
