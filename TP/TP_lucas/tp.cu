@@ -18,8 +18,8 @@
         } \
     } while(0)
 
-// Fonction Gaussienne
-double gaussian(double x, double sigma) {
+// Fonction Gaussienne compatible CPU et GPU
+__host__ __device__ double gaussian(double x, double sigma) {
     return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
@@ -81,7 +81,7 @@ void bilateral_filter_cpu(unsigned char *src, unsigned char *dst, int width, int
 // Noyau CUDA pour le filtre bilatéral
 __global__ void bilateral_filter_kernel(
     unsigned char *src, 
-    unsigned char *dst, 
+    unsigned char *dst, ascended
     int width, 
     int height, 
     int channels, 
@@ -130,7 +130,6 @@ __global__ void bilateral_filter_kernel(
 void bilateral_filter(unsigned char *src, unsigned char *dst, int width, int height, int channels, int d, double sigma_color, double sigma_space) {
     int radius = d / 2;
 
-    // Précalcul des poids spatiaux sur CPU
     double *spatial_weights = (double *)malloc(d * d * sizeof(double));
     if (!spatial_weights) {
         printf("Échec de l'allocation mémoire pour les poids spatiaux !\n");
@@ -143,7 +142,6 @@ void bilateral_filter(unsigned char *src, unsigned char *dst, int width, int hei
         }
     }
 
-    // Allocation mémoire sur GPU
     unsigned char *d_src, *d_dst;
     double *d_spatial_weights;
 
@@ -151,23 +149,18 @@ void bilateral_filter(unsigned char *src, unsigned char *dst, int width, int hei
     CUDA_CHECK(cudaMalloc(&d_dst, width * height * channels * sizeof(unsigned char)));
     CUDA_CHECK(cudaMalloc(&d_spatial_weights, d * d * sizeof(double)));
 
-    // Copie des données vers GPU
     CUDA_CHECK(cudaMemcpy(d_src, src, width * height * channels * sizeof(unsigned char), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_spatial_weights, spatial_weights, d * d * sizeof(double), cudaMemcpyHostToDevice));
 
-    // Configuration de la grille et des blocs
     dim3 blockDim(16, 16);
     dim3 gridDim((width + blockDim.x - 1) / blockDim.x, (height + blockDim.y - 1) / blockDim.y);
 
-    // Lancement du noyau
     bilateral_filter_kernel<<<gridDim, blockDim>>>(d_src, d_dst, width, height, channels, d, d_spatial_weights, sigma_color, sigma_space);
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    // Récupération des résultats
     CUDA_CHECK(cudaMemcpy(dst, d_dst, width * height * channels * sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
-    // Libération mémoire GPU
     CUDA_CHECK(cudaFree(d_src));
     CUDA_CHECK(cudaFree(d_dst));
     CUDA_CHECK(cudaFree(d_spatial_weights));
