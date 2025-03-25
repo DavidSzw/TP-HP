@@ -11,8 +11,7 @@
 
 // __host__ indique que la fonction est exécutée sur le CPU
 // __device__ indique que la fonction est exécutée sur le GPU
-//__host__ 
-__device__ double gaussian(double x, double sigma) {
+__host__ __device__ double gaussian(double x, double sigma) {
     return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
