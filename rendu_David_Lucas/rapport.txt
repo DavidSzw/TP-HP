@@ -1,0 +1,79 @@
+#######################################################
+##################   Rapport de TP   ##################
+##################   David et Lucas  ##################
+#######################################################
+
+Pour executer le code c, ouvrez le dossier dans un terminal et tapez les commandes suivantes :
+    gcc -o tp tp.c -lm -Wall
+    ./tp lena512.bmp lena512_filtered.bmp
+
+Pour executer le code cuda, ouvrez le dossier dans un terminal sur une vm qui permet d'utiliser des GPU et tapez les commandes suivantes :
+    nvcc -o tp tp.cu -lm -Wall
+    ./tp lena512.bmp lena512_filtered.bmp
+
+Code C:
+Dans la version du code en c, dans le main, on commence par verifier qu'un nom à été donnée pour l'image d'entrée ainsi que pour l'image de sortie.
+On chagre ensuit l'image de départ.
+On vérifie que l'image a une taille acceptable.
+On alloue de la mémoire pour l'image de sortie.
+On appele la fonction bilateral_filter pour appliquer le filtre bilatéral sur l'image et on mesure le temps d'exécution de la fonction.
+    Dans la fonction bilateral_filter, on commence par allouer de la place pour les poids Gaussiens spaciaux
+    On calcule ensuite ces poids gaussiens spaciaux pour chaque pixel de l'image à l'aide de la fonction gaussian.
+    En suite, pour chaque pixel on défini une fenetre qui comprend ces voisins et on itère sur chaque voisin.
+    On vérifie que tout ces "pixels voisins" font bien partie de l'image (Attention aux bords).
+    Pour chaque voisin on calcule le poids de la plage entre le pixel et son voisin à l'aide de la fonction gaussian.
+    On calcule ensuite le poids total du pixel en multipliant le poids spatial et le poids de la plage.
+    On normalise le poids total en divisant par la somme des poids de tous les pixels voisins.
+    On applique le filtre bilatéral sur l'image en multipliant chaque pixel par son poids total.
+    On libère la mémoire allouée pour les poids gaussiens spaciaux.
+    On retourne l'image filtrée.
+Après l'application de la fonction bilateral_filter, on affiche le temps d'exécution de la fonction et on sauvegarde l'image filtrée dans un fichier.
+On fini par libérer la mémoire allouée au début pour l'image de départ et l'image de sortie.
+
+
+Code Cuda :
+Dans la version cuda du code, dans le main, on commence par verifier qu'un nom à été donnée pour l'image d'entrée ainsi que pour l'image de sortie.
+On chagre ensuit l'image de départ.
+On vérifie que l'image a une taille acceptable.
+On alloue de la mémoire pour l'image de sortie.
+On initialise les constantes sur la tailles du voisinage et les caratéristiques de l'image.
+On alloue alors de la mémoire sur le CPU pour les poids spaciaux puis on calcule le poid spécial de chaque pixel grace à la fonction gaussian.
+    La fonction gaussian est définie comme __host__ et __device__, elle peut donc être utilisée sur le CPU comme sur les GPU.
+On alloue de la mémoire sur le GPU pour les poids spaciaux et on copie les poids spaciaux du CPU au GPU.
+On définit la taille des blocs et des grilles pour le kernel.
+On appele la fonction bilateral_filter_kernel pour appliquer le filtre bilatéral sur l'image et on mesure le temps d'exécution de la fonction. La fonction est définie comme globale pour qu'elle puisse être appelée depuis le CPU et exécutée sur les GPU.
+    Dans la fonction bilateral_filter_kernel, on commence par calculer l'indice du pixel à traiter.
+    On vérifie que l'indice est bien dans l'image.
+    On calcule ensuite les poids de chaque pixel voisin en utilisant les poids spaciaux et la fonction gaussian.
+    On calcule le poids total du pixel en multipliant le poids spatial et le poids de la plage.
+    On normalise le poids total en divisant par la somme des poids de tous les pixels voisins.
+    On applique le filtre bilatéral sur l'image en multipliant chaque pixel par son poids total.
+On copie l'image filtrée du GPU au CPU.
+On sauvegarde l'image 
+On termine par libérer l'espace réservé sur le CPU et sur les GPU
+
+
+Difficultés de parallélisation
+Fenêtre de voisinage :
+Le filtre bilatéral utilise une fenêtre de voisinage pour chaque pixel, ce qui signifie que chaque pixel de sortie dépend de plusieurs pixels d'entrée autour de lui. Cela crée une dépendance spatiale qui complique la parallélisation.
+Pour paralléliser ce processus, il faut s'assurer que chaque thread ou unité de traitement a accès à tous les pixels nécessaires dans la fenêtre de voisinage. Cela peut nécessiter des copies de données ou des mécanismes de synchronisation pour éviter les conflits d'accès.
+Accès mémoire :
+Les accès mémoire non contigus peuvent réduire l'efficacité de la parallélisation. Dans le filtre bilatéral, les pixels voisins sont souvent dispersés en mémoire, ce qui peut entraîner des cache misses et des ralentissements.
+L'utilisation de structures de données contiguës et l'optimisation de l'accès mémoire peuvent améliorer les performances. Par exemple, en réorganisant les données pour qu'elles soient plus locales en mémoire.
+
+Performance : 
+En utilisant seulement les CPU, le programme tp.c mets 0.447 secondes à appliquer le filtre bilatéral sur l'image lena512.bmp.
+En utilisant les CPU et les GPU, le programme tp.cu met 0.118 secondes à appliquer le filtre bilatéral sur l'image lena512.bmp.
+L'utilisation des GPU et de CUDA permet donc d'appliquer le filtre quatres fois plus rapidment sur l'image. 
+
+Bonus : Explication détaillée de la ligne 71
+        unsigned char *output_pixel = dst + (y * width + x) * channels;
+    dst : le tableau linéaire qui stock l'image en 1D
+    y : l'ordonnée du pixel dans l'image de départ (tableau 2D)
+    width : la largeur de l'image
+    x : l'abcyssse du pixel dans l'image de départ (tableau 2D)
+    channels : le nombre de channels de l'image ici 1 car l'image est en niveaux de gris.
+Cette ligne permet de calculer l'adresse du pixel de sortie (adresse vers laquelle pointe le pointeur *output_pixel) en fonction de ses coordonnées (x, y) et du nombre de canaux de couleur de l'image.
+(y * width + x) est la formule qui permet de passer des coordonnées 2D (x, y) à une coordonnée 1D pour stocker un tableau 2D dans un tabeau 1D.
+On multiplie ensuite par channels pour prendre en compte le nombre de channels de l'image. Si l'image avait été en couleur RGB, les trois composantes du pixel aurait été stockée à la suite dans le tableau 1D. channels aurait valu 3, cela nous aurait permis de se déplacer de trois rangs dans le tableau 1D pour passer d'un pixel à l'autre.
+Enfin, on ajoute dst pour se décalr par rapport a la poition de base
